@@ -2,3 +2,6 @@
 	path = HKLib
 	url = https://github.com/obilang/HKLib.git
 	branch = main
+[submodule "IONET"]
+	path = IONET
+	url = https://github.com/KillzXGaming/IONET.git
