@@ -4,6 +4,6 @@
 	branch = main
 
 [submodule "HKLib"]
-	path = IONET
+	path = HKLib
 	url = https://github.com/obilang/HKLib.git
 	branch = main
