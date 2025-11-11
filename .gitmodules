@@ -1,0 +1,9 @@
+[submodule "IONET"]
+	path = IONET
+	url = https://github.com/KillzXGaming/IONET.git
+	branch = main
+
+[submodule "HKLib"]
+	path = IONET
+	url = https://github.com/obilang/HKLib.git
+	branch = main
