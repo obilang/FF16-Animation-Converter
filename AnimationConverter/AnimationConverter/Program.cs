@@ -12,50 +12,169 @@ class Program
 {
     static void Main(string[] args)
     {
-        //string hkxPath = @"E:\Git\HavokConvertExperiment\temp\auto_attack1_2018_tag_back.hkt";
-        string skeleton_hkxPath = @"D:\Workspace\FF16\HavokConvertExperiment\temp\body.skl";
-        string? compendiumPath = null; // Set if your hkx references one: @"C:\path\to\types.compendium"
-
-        var serializer = new HavokBinarySerializer();
-
-        if (!string.IsNullOrEmpty(compendiumPath))
-            serializer.LoadCompendium(compendiumPath);
-
-        // Read the root object
-        IEnumerable<IHavokObject> havokObjects = serializer.ReadAllObjects(skeleton_hkxPath);
-
-        var skeletons = havokObjects.OfType<hkaSkeleton>().ToList();
-        var skeleton = skeletons.FirstOrDefault(); // null if none found
-
-
-
-        // Animation
-        string animation_hkxPath = @"D:\GameDev\Resource\FFXVIOut\animation\chara\c1001\animation\a0001\common\ramuh\judgement_atk01.anmb";
-
-        var serializer2 = new HavokBinarySerializer();
-
-        IEnumerable<IHavokObject> havokObjects2 = serializer2.ReadAllObjects(animation_hkxPath);
-        var animations = havokObjects2.OfType<hkaAnimation>().ToList();
-        var animation = animations.FirstOrDefault(); // null if none found
-        animation.setSkeleton(skeleton);
-
-        var animationBindings = havokObjects2.OfType<hkaAnimationBinding>().ToList();
-        var animationBinding = animationBindings.FirstOrDefault(); // null if none found
-
-
-        var allTracks = animation.fetchAllTracks();
-
-
-
-        var scene = BuildSimpleSkinnedScene(skeleton, animationBinding, allTracks);
-        IOManager.ExportScene(scene, "d:/temp/simple_skeletal.dae", new ExportSettings
+        if (args.Length < 2)
         {
-            ExportAnimations = true,
-            FrameRate = 30.0f,   // used to convert frames -> seconds in DAE
-            BlenderMode = true   // improves DAE compatibility for Blender
-        });
+            PrintUsage();
+            return;
+        }
 
-        Console.WriteLine("Exported d:/temp/simple_skeletal.dae");
+        string skeletonPath = args[0];
+        string animationPathOrFolder = args[1];
+        string? outputFolder = null;
+
+        // Parse optional -o flag
+        for (int i = 2; i < args.Length; i++)
+        {
+            if (args[i] == "-o" && i + 1 < args.Length)
+            {
+                outputFolder = args[i + 1];
+                i++; // Skip next argument as it's the output folder path
+            }
+        }
+
+        // Validate skeleton file exists
+        if (!File.Exists(skeletonPath))
+        {
+            Console.WriteLine($"Error: Skeleton file not found: {skeletonPath}");
+            return;
+        }
+
+        // Load skeleton once
+        Console.WriteLine($"Loading skeleton from: {skeletonPath}");
+        var skeleton = LoadSkeleton(skeletonPath);
+        if (skeleton == null)
+        {
+            Console.WriteLine("Error: Failed to load skeleton.");
+            return;
+        }
+
+        // Determine if input is a file or folder
+        List<string> animationFiles = new List<string>();
+        
+        if (Directory.Exists(animationPathOrFolder))
+        {
+            // Recursive search for .anmb files
+            Console.WriteLine($"Searching for .anmb files in: {animationPathOrFolder}");
+            animationFiles = Directory.GetFiles(animationPathOrFolder, "*.anmb", SearchOption.AllDirectories).ToList();
+            Console.WriteLine($"Found {animationFiles.Count} animation file(s)");
+        }
+        else if (File.Exists(animationPathOrFolder))
+        {
+            // Single file
+            animationFiles.Add(animationPathOrFolder);
+        }
+        else
+        {
+            Console.WriteLine($"Error: Animation path not found: {animationPathOrFolder}");
+            return;
+        }
+
+        if (animationFiles.Count == 0)
+        {
+            Console.WriteLine("No animation files found.");
+            return;
+        }
+
+        // Process each animation file
+        foreach (var animFile in animationFiles)
+        {
+            ProcessAnimation(animFile, skeleton, outputFolder);
+        }
+
+        Console.WriteLine("All animations processed successfully.");
+    }
+
+    static void PrintUsage()
+    {
+        Console.WriteLine("Usage:");
+        Console.WriteLine("  AnimationConverter <skeleton_file> <animation_file_or_folder> [-o <output_folder>]");
+        Console.WriteLine();
+        Console.WriteLine("Arguments:");
+        Console.WriteLine("  skeleton_file              Path to the skeleton file (.skl) [Required]");
+        Console.WriteLine("  animation_file_or_folder   Path to a single animation file (.anmb) or folder containing .anmb files [Required]");
+        Console.WriteLine("  -o <output_folder>         Output folder for exported files [Optional, default: current directory]");
+        Console.WriteLine();
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  AnimationConverter skeleton.skl animation.anmb");
+        Console.WriteLine("  AnimationConverter skeleton.skl C:\\animations");
+        Console.WriteLine("  AnimationConverter skeleton.skl animation.anmb -o C:\\output");
+        Console.WriteLine("  AnimationConverter skeleton.skl C:\\animations -o C:\\output");
+    }
+
+    static hkaSkeleton? LoadSkeleton(string skeletonPath)
+    {
+        try
+        {
+            var serializer = new HavokBinarySerializer();
+            IEnumerable<IHavokObject> havokObjects = serializer.ReadAllObjects(skeletonPath);
+            var skeletons = havokObjects.OfType<hkaSkeleton>().ToList();
+            return skeletons.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading skeleton: {ex.Message}");
+            return null;
+        }
+    }
+
+    static void ProcessAnimation(string animationPath, hkaSkeleton skeleton, string? outputFolder)
+    {
+        try
+        {
+            Console.WriteLine($"Processing: {animationPath}");
+
+            var serializer = new HavokBinarySerializer();
+            IEnumerable<IHavokObject> havokObjects = serializer.ReadAllObjects(animationPath);
+            
+            var animations = havokObjects.OfType<hkaAnimation>().ToList();
+            var animation = animations.FirstOrDefault();
+            
+            if (animation == null)
+            {
+                Console.WriteLine($"  Warning: No animation found in {animationPath}");
+                return;
+            }
+
+            animation.setSkeleton(skeleton);
+
+            var animationBindings = havokObjects.OfType<hkaAnimationBinding>().ToList();
+            var animationBinding = animationBindings.FirstOrDefault();
+
+            if (animationBinding == null)
+            {
+                Console.WriteLine($"  Warning: No animation binding found in {animationPath}");
+                return;
+            }
+
+            var allTracks = animation.fetchAllTracks();
+
+            var scene = BuildSimpleSkinnedScene(skeleton, animationBinding, allTracks);
+
+            // Generate output path
+            string fileName = Path.GetFileNameWithoutExtension(animationPath);
+            string outputDir = outputFolder ?? Directory.GetCurrentDirectory();
+            
+            // Create output directory if it doesn't exist
+            if (!Directory.Exists(outputDir))
+            {
+                Directory.CreateDirectory(outputDir);
+            }
+
+            string outputPath = Path.Combine(outputDir, $"{fileName}.dae");
+
+            IOManager.ExportScene(scene, outputPath, new ExportSettings
+            {
+                ExportAnimations = true,
+                FrameRate = 30.0f,
+                BlenderMode = true
+            });
+
+            Console.WriteLine($"  Exported: {outputPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Error processing {animationPath}: {ex.Message}");
+        }
     }
 
     private static IOScene BuildSimpleSkinnedScene(hkaSkeleton khaSkeleton, hkaAnimationBinding hkaAnimationBinding, Dictionary<int, List<hkQsTransform>> poseAtTime)
