@@ -50,35 +50,38 @@ class Program
 
         // Determine if input is a file or folder
         List<string> animationFiles = new List<string>();
+      string baseInputPath;
         
         if (Directory.Exists(animationPathOrFolder))
         {
             // Recursive search for .anmb files
             Console.WriteLine($"Searching for .anmb files in: {animationPathOrFolder}");
-            animationFiles = Directory.GetFiles(animationPathOrFolder, "*.anmb", SearchOption.AllDirectories).ToList();
+     animationFiles = Directory.GetFiles(animationPathOrFolder, "*.anmb", SearchOption.AllDirectories).ToList();
             Console.WriteLine($"Found {animationFiles.Count} animation file(s)");
-        }
+            baseInputPath = animationPathOrFolder;
+ }
         else if (File.Exists(animationPathOrFolder))
-        {
-            // Single file
-            animationFiles.Add(animationPathOrFolder);
+    {
+     // Single file
+       animationFiles.Add(animationPathOrFolder);
+            baseInputPath = Path.GetDirectoryName(animationPathOrFolder) ?? Directory.GetCurrentDirectory();
         }
-        else
+     else
         {
-            Console.WriteLine($"Error: Animation path not found: {animationPathOrFolder}");
-            return;
-        }
+          Console.WriteLine($"Error: Animation path not found: {animationPathOrFolder}");
+  return;
+    }
 
-        if (animationFiles.Count == 0)
-        {
+    if (animationFiles.Count == 0)
+     {
             Console.WriteLine("No animation files found.");
-            return;
-        }
+        return;
+   }
 
-        // Process each animation file
-        foreach (var animFile in animationFiles)
+  // Process each animation file
+ foreach (var animFile in animationFiles)
         {
-            ProcessAnimation(animFile, skeleton, outputFolder);
+  ProcessAnimation(animFile, skeleton, outputFolder, baseInputPath);
         }
 
         Console.WriteLine("All animations processed successfully.");
@@ -117,7 +120,7 @@ class Program
         }
     }
 
-    static void ProcessAnimation(string animationPath, hkaSkeleton skeleton, string? outputFolder)
+    static void ProcessAnimation(string animationPath, hkaSkeleton skeleton, string? outputFolder, string baseInputPath)
     {
         try
         {
@@ -128,53 +131,68 @@ class Program
             
             var animations = havokObjects.OfType<hkaAnimation>().ToList();
             var animation = animations.FirstOrDefault();
-            
+      
             if (animation == null)
             {
-                Console.WriteLine($"  Warning: No animation found in {animationPath}");
-                return;
+    Console.WriteLine($"  Warning: No animation found in {animationPath}");
+      return;
             }
 
-            animation.setSkeleton(skeleton);
+    animation.setSkeleton(skeleton);
 
             var animationBindings = havokObjects.OfType<hkaAnimationBinding>().ToList();
-            var animationBinding = animationBindings.FirstOrDefault();
+     var animationBinding = animationBindings.FirstOrDefault();
 
             if (animationBinding == null)
-            {
-                Console.WriteLine($"  Warning: No animation binding found in {animationPath}");
-                return;
-            }
+  {
+        Console.WriteLine($"  Warning: No animation binding found in {animationPath}");
+              return;
+     }
 
             var allTracks = animation.fetchAllTracks();
 
             var scene = BuildSimpleSkinnedScene(skeleton, animationBinding, allTracks);
 
-            // Generate output path
+      // Generate output path preserving folder structure
             string fileName = Path.GetFileNameWithoutExtension(animationPath);
-            string outputDir = outputFolder ?? Directory.GetCurrentDirectory();
+            string outputDir;
+       
+   if (outputFolder != null)
+     {
+                // Get relative path from base input to current animation file
+  string animDir = Path.GetDirectoryName(animationPath) ?? string.Empty;
+ string relativePath = Path.GetRelativePath(baseInputPath, animDir);
+  
+   // Combine output folder with relative path
+     outputDir = Path.Combine(outputFolder, relativePath);
+            }
+            else
+            {
+  // If no output folder specified, use the same directory as the animation file
+     outputDir = Path.GetDirectoryName(animationPath) ?? Directory.GetCurrentDirectory();
+            }
             
             // Create output directory if it doesn't exist
-            if (!Directory.Exists(outputDir))
-            {
-                Directory.CreateDirectory(outputDir);
+      if (!Directory.Exists(outputDir))
+         {
+         Directory.CreateDirectory(outputDir);
             }
 
             string outputPath = Path.Combine(outputDir, $"{fileName}.dae");
 
-            IOManager.ExportScene(scene, outputPath, new ExportSettings
-            {
-                ExportAnimations = true,
-                FrameRate = 30.0f,
-                BlenderMode = true
-            });
-
-            Console.WriteLine($"  Exported: {outputPath}");
-        }
-        catch (Exception ex)
+  IOManager.ExportScene(scene, outputPath, new ExportSettings
         {
-            Console.WriteLine($"  Error processing {animationPath}: {ex.Message}");
+    ExportAnimations = true,
+    FrameRate = 30.0f,
+         BlenderMode = true
+     });
+
+   Console.WriteLine($"Exported: {outputPath}");
         }
+    catch (Exception ex)
+        {
+      Console.WriteLine($"  Error processing {animationPath}: {ex.Message}");
+  }
     }
 
     private static IOScene BuildSimpleSkinnedScene(hkaSkeleton khaSkeleton, hkaAnimationBinding hkaAnimationBinding, Dictionary<int, List<hkQsTransform>> poseAtTime)
@@ -183,8 +201,8 @@ class Program
         for (int i = 0; i < khaSkeleton.m_bones.Count; i++)
         {
             var bone = khaSkeleton.m_bones[i];
-            Console.WriteLine($"Bone {i}: {bone.m_name}");
-            Debug.WriteLine($"Bone {i}: {bone.m_name}");
+            //Console.WriteLine($"Bone {i}: {bone.m_name}");
+            //Debug.WriteLine($"Bone {i}: {bone.m_name}");
 
             var normalizedRotation = Quaternion.Normalize(khaSkeleton.m_referencePose[i].m_rotation);
             var outputBone = new IOBone
