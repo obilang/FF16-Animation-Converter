@@ -4,4 +4,4 @@
 	branch = main
 [submodule "IONET"]
 	path = IONET
-	url = https://github.com/KillzXGaming/IONET.git
+	url = https://github.com/obilang/IONET
