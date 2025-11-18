@@ -65,6 +65,7 @@ class Program
 
         // Determine if input is a file or folder
         List<string> animationFiles = new List<string>();
+        string? inputBaseFolder = null;
         
         if (Directory.Exists(animationPathOrFolder))
         {
@@ -72,11 +73,13 @@ class Program
             Console.WriteLine($"Searching for .anmb files in: {animationPathOrFolder}");
             animationFiles = Directory.GetFiles(animationPathOrFolder, "*.anmb", SearchOption.AllDirectories).ToList();
             Console.WriteLine($"Found {animationFiles.Count} animation file(s)");
+            inputBaseFolder = animationPathOrFolder;
         }
         else if (File.Exists(animationPathOrFolder))
         {
             // Single file
             animationFiles.Add(animationPathOrFolder);
+            inputBaseFolder = Path.GetDirectoryName(animationPathOrFolder);
         }
         else
         {
@@ -96,7 +99,7 @@ class Program
         // Process each animation file
         foreach (var animFile in animationFiles)
         {
-            ProcessAnimation(animFile, skeleton, outputFolder, exportFormat);
+            ProcessAnimation(animFile, skeleton, outputFolder, exportFormat, inputBaseFolder);
         }
 
         Console.WriteLine("All animations processed successfully.");
@@ -139,7 +142,7 @@ class Program
         }
     }
 
-    static void ProcessAnimation(string animationPath, hkaSkeleton skeleton, string? outputFolder, ExportFormat exportFormat)
+    static void ProcessAnimation(string animationPath, hkaSkeleton skeleton, string? outputFolder, ExportFormat exportFormat, string? inputBaseFolder = null)
     {
         try
         {
@@ -174,9 +177,23 @@ class Program
             string animationName = Path.GetFileNameWithoutExtension(animationPath);
             var scene = BuildSimpleSkinnedScene(skeleton, animationBinding, allTracks, exportFormat, animationName);
 
-            // Generate output path
+            // Generate output path preserving folder structure
             string fileName = Path.GetFileNameWithoutExtension(animationPath);
             string outputDir = outputFolder ?? Directory.GetCurrentDirectory();
+            
+            // Preserve folder structure if processing from a folder
+            if (inputBaseFolder != null)
+            {
+                string? animDirectory = Path.GetDirectoryName(animationPath);
+                if (animDirectory != null)
+                {
+                    string relativePath = Path.GetRelativePath(inputBaseFolder, animDirectory);
+                    if (relativePath != ".")
+                    {
+                        outputDir = Path.Combine(outputDir, relativePath);
+                    }
+                }
+            }
             
             // Create output directory if it doesn't exist
             if (!Directory.Exists(outputDir))
@@ -256,7 +273,7 @@ class Program
         model.Meshes.Clear();
 
 
-        var sceneAnim = new IOAnimation { Name = "anm", StartFrame = 0, EndFrame = poseAtTime[hkaAnimationBinding.m_transformTrackToBoneIndices[0]].Count - 1 };
+        var sceneAnim = new IOAnimation { Name = animationName, StartFrame = 0, EndFrame = poseAtTime[hkaAnimationBinding.m_transformTrackToBoneIndices[0]].Count - 1 };
         for (int i = 0; i < hkaAnimationBinding.m_transformTrackToBoneIndices.Count; i++)
         {
             int boneIndex = hkaAnimationBinding.m_transformTrackToBoneIndices[i];
