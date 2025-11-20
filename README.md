@@ -34,6 +34,11 @@ By default, output files are saved in the same folder as the original `.anmb` fi
 AnimationConverter.exe <skeleton_file> <animation_input> -o <output_folder>
 ```
 
+**Example:**
+```bash
+AnimationConverter.exe "D:\FFXVIOut\chara\c1001\pack\c1001.extracted\animation\chara\c1001\skeleton\body\body.skl" "D:\FFXVIOut\animation\chara\c1001\animation\a0001\common\" -o "D:\temp\output"
+```
+
 ### Output as dae
 ```bash
 AnimationConverter.exe <skeleton_file> <animation_folder> -dae
@@ -42,10 +47,7 @@ AnimationConverter.exe <skeleton_file> <animation_folder> -dae
 By default, the animation will be exported as gltf, add -dae if you want dae.
 For importing into blender, it need to be gltf. 
 
-**Example:**
-```bash
-AnimationConverter.exe "D:\FFXVIOut\chara\c1001\pack\c1001.extracted\animation\chara\c1001\skeleton\body\body.skl" "D:\FFXVIOut\animation\chara\c1001\animation\a0001\common\" -o "D:\temp\output"
-```
+
 
 ## Parameters
 
