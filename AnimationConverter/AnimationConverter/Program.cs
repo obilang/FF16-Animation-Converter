@@ -219,7 +219,7 @@ class Program
         }
     }
 
-    private static IOScene BuildSimpleSkinnedScene(hkaSkeleton khaSkeleton, hkaAnimationBinding hkaAnimationBinding, Dictionary<int, List<hkQsTransform>> poseAtTime, ExportFormat exportFormat, string animationName)
+    private static IOScene BuildSimpleSkinnedScene(hkaSkeleton khaSkeleton, hkaAnimationBinding hkaAnimationBinding, List<List<hkQsTransform>> allFrames, ExportFormat exportFormat, string animationName)
     {
         List<IOBone> bones = new List<IOBone>();
         for (int i = 0; i < khaSkeleton.m_bones.Count; i++)
@@ -263,7 +263,6 @@ class Program
             }
         }
 
-
         var skeleton = new IOSkeleton();
         skeleton.RootBones.Add(rootBone);
 
@@ -272,8 +271,9 @@ class Program
         // Ensure no mesh is exported
         model.Meshes.Clear();
 
-
-        var sceneAnim = new IOAnimation { Name = animationName, StartFrame = 0, EndFrame = poseAtTime[hkaAnimationBinding.m_transformTrackToBoneIndices[0]].Count - 1 };
+        int numFrames = allFrames.Count;
+        var sceneAnim = new IOAnimation { Name = animationName, StartFrame = 0, EndFrame = numFrames - 1 };
+        
         for (int i = 0; i < hkaAnimationBinding.m_transformTrackToBoneIndices.Count; i++)
         {
             int boneIndex = hkaAnimationBinding.m_transformTrackToBoneIndices[i];
@@ -286,30 +286,18 @@ class Program
             var scaleYTrack = new IOAnimationTrack(IOAnimationTrackType.ScaleY);
             var scaleZTrack = new IOAnimationTrack(IOAnimationTrackType.ScaleZ);
 
-            if (!poseAtTime.ContainsKey(boneIndex))
-                continue;
-
-            var poseFrames = poseAtTime[boneIndex];
-            for (int f = 0; f < poseFrames.Count; f++)
+            // Process all frames for this bone
+            for (int f = 0; f < numFrames; f++)
             {
-                int frame = f;
-                hkQsTransform transform = poseFrames[f];
+                hkQsTransform transform = allFrames[f][i];
 
-                // Position
-                float posX = transform.m_translation.X;
-                float posY = transform.m_translation.Y;
-                float posZ = transform.m_translation.Z;
-                posXTrack.InsertKeyframe(frame, posX);
-                posYTrack.InsertKeyframe(frame, posY);
-                posZTrack.InsertKeyframe(frame, posZ);
+                posXTrack.InsertKeyframe(f, transform.m_translation.X);
+                posYTrack.InsertKeyframe(f, transform.m_translation.Y);
+                posZTrack.InsertKeyframe(f, transform.m_translation.Z);
 
-                // Scale
-                float scaleX = transform.m_scale.X;
-                float scaleY = transform.m_scale.Y;
-                float scaleZ = transform.m_scale.Z;
-                scaleXTrack.InsertKeyframe(frame, scaleX);
-                scaleYTrack.InsertKeyframe(frame, scaleY);
-                scaleZTrack.InsertKeyframe(frame, scaleZ);
+                scaleXTrack.InsertKeyframe(f, transform.m_scale.X);
+                scaleYTrack.InsertKeyframe(f, transform.m_scale.Y);
+                scaleZTrack.InsertKeyframe(f, transform.m_scale.Z);
             }
 
             boneGroup.Tracks.Add(posXTrack);
@@ -327,10 +315,9 @@ class Program
                 var rotYTrack = new IOAnimationTrack(IOAnimationTrackType.RotationEulerY);
                 var rotZTrack = new IOAnimationTrack(IOAnimationTrackType.RotationEulerZ);
 
-                for (int f = 0; f < poseFrames.Count; f++)
+                for (int f = 0; f < numFrames; f++)
                 {
-                    int frame = f;
-                    hkQsTransform transform = poseFrames[f];
+                    hkQsTransform transform = allFrames[f][i];
 
                     // Convert quaternion to Euler angles (XYZ rotation order)
                     float sinr_cosp = 2.0f * (transform.m_rotation.W * transform.m_rotation.X + transform.m_rotation.Y * transform.m_rotation.Z);
@@ -338,20 +325,16 @@ class Program
                     float angleX = MathF.Atan2(sinr_cosp, cosr_cosp);
 
                     float sinp = 2.0f * (transform.m_rotation.W * transform.m_rotation.Y - transform.m_rotation.Z * transform.m_rotation.X);
-                    float angleY;
-                    if (MathF.Abs(sinp) >= 1.0f)
-                        angleY = MathF.CopySign(MathF.PI / 2.0f, sinp);
-                    else
-                        angleY = MathF.Asin(sinp);
+                    float angleY = MathF.Abs(sinp) >= 1.0f ? MathF.CopySign(MathF.PI / 2.0f, sinp) : MathF.Asin(sinp);
 
                     float siny_cosp = 2.0f * (transform.m_rotation.W * transform.m_rotation.Z + transform.m_rotation.X * transform.m_rotation.Y);
                     float cosy_cosp = 1.0f - 2.0f * (transform.m_rotation.Y * transform.m_rotation.Y + transform.m_rotation.Z * transform.m_rotation.Z);
                     float angleZ = MathF.Atan2(siny_cosp, cosy_cosp);
 
                     // TODO: dae output need to swap x and z rotation?
-                    rotXTrack.InsertKeyframe(frame, angleZ);
-                    rotYTrack.InsertKeyframe(frame, angleY);
-                    rotZTrack.InsertKeyframe(frame, angleX);
+                    rotXTrack.InsertKeyframe(f, angleZ);
+                    rotYTrack.InsertKeyframe(f, angleY);
+                    rotZTrack.InsertKeyframe(f, angleX);
                 }
 
                 boneGroup.Tracks.Add(rotZTrack);
@@ -366,15 +349,14 @@ class Program
                 var quatZTrack = new IOAnimationTrack(IOAnimationTrackType.QuatZ);
                 var quatWTrack = new IOAnimationTrack(IOAnimationTrackType.QuatW);
 
-                for (int f = 0; f < poseFrames.Count; f++)
+                for (int f = 0; f < numFrames; f++)
                 {
-                    int frame = f;
-                    hkQsTransform transform = poseFrames[f];
+                    hkQsTransform transform = allFrames[f][i];
 
-                    quatXTrack.InsertKeyframe(frame, transform.m_rotation.X);
-                    quatYTrack.InsertKeyframe(frame, transform.m_rotation.Y);
-                    quatZTrack.InsertKeyframe(frame, transform.m_rotation.Z);
-                    quatWTrack.InsertKeyframe(frame, transform.m_rotation.W);
+                    quatXTrack.InsertKeyframe(f, transform.m_rotation.X);
+                    quatYTrack.InsertKeyframe(f, transform.m_rotation.Y);
+                    quatZTrack.InsertKeyframe(f, transform.m_rotation.Z);
+                    quatWTrack.InsertKeyframe(f, transform.m_rotation.W);
                 }
 
                 boneGroup.Tracks.Add(quatXTrack);
