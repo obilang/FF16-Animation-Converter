@@ -94,7 +94,7 @@ class Program
         }
 
         Console.WriteLine($"Export format: {exportFormat}");
-        Console.WriteLine($"Output folder: {outputFolder ?? Directory.GetCurrentDirectory()}");
+        Console.WriteLine($"Output folder: {outputFolder ?? "same as input"}");
 
         // Process each animation file
         foreach (var animFile in animationFiles)
@@ -111,13 +111,13 @@ class Program
         Console.WriteLine("  AnimationConverter <skeleton_file> <animation_file_or_folder> [options]");
         Console.WriteLine();
         Console.WriteLine("Arguments:");
-        Console.WriteLine("  skeleton_file              Path to the skeleton file (.skl) [Required]");
+        Console.WriteLine("  skeleton_file            Path to the skeleton file (.skl) [Required]");
         Console.WriteLine("  animation_file_or_folder   Path to a single animation file (.anmb) or folder containing .anmb files [Required]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  -o <output_folder>         Output folder for exported files [Optional, default: current directory]");
-        Console.WriteLine("  -gltf                      Export as GLTF format (default)");
-        Console.WriteLine("  -dae                       Export as Collada DAE format");
+        Console.WriteLine("  -o <output_folder>         Output folder for exported files [Optional, default: same folder as input animation]");
+        Console.WriteLine("  -gltf      Export as GLTF format (default)");
+        Console.WriteLine("  -dae              Export as Collada DAE format");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  AnimationConverter skeleton.skl animation.anmb");
@@ -150,14 +150,14 @@ class Program
 
             var serializer = new HavokBinarySerializer();
             IEnumerable<IHavokObject> havokObjects = serializer.ReadAllObjects(animationPath);
-            
+       
             var animations = havokObjects.OfType<hkaAnimation>().ToList();
-            var animation = animations.FirstOrDefault();
-            
-            if (animation == null)
+  var animation = animations.FirstOrDefault();
+ 
+        if (animation == null)
             {
-                Console.WriteLine($"  Warning: No animation found in {animationPath}");
-                return;
+         Console.WriteLine($"  Warning: No animation found in {animationPath}");
+        return;
             }
 
             animation.setSkeleton(skeleton);
@@ -165,57 +165,58 @@ class Program
             var animationBindings = havokObjects.OfType<hkaAnimationBinding>().ToList();
             var animationBinding = animationBindings.FirstOrDefault();
 
-            if (animationBinding == null)
-            {
+  if (animationBinding == null)
+        {
                 Console.WriteLine($"  Warning: No animation binding found in {animationPath}");
-                return;
-            }
+ return;
+     }
 
-            var allTracks = animation.fetchAllTracks();
+      var allTracks = animation.fetchAllTracks();
 
-            // Get file name without extension for animation name
-            string animationName = Path.GetFileNameWithoutExtension(animationPath);
-            var scene = BuildSimpleSkinnedScene(skeleton, animationBinding, allTracks, exportFormat, animationName);
+        // Get file name without extension for animation name
+          string animationName = Path.GetFileNameWithoutExtension(animationPath);
+  var scene = BuildSimpleSkinnedScene(skeleton, animationBinding, allTracks, exportFormat, animationName);
 
             // Generate output path preserving folder structure
-            string fileName = Path.GetFileNameWithoutExtension(animationPath);
-            string outputDir = outputFolder ?? Directory.GetCurrentDirectory();
+        string fileName = Path.GetFileNameWithoutExtension(animationPath);
+            // Default to the animation file's directory if no output folder specified
+   string outputDir = outputFolder ?? Path.GetDirectoryName(animationPath) ?? Directory.GetCurrentDirectory();
             
             // Preserve folder structure if processing from a folder
-            if (inputBaseFolder != null)
+      if (outputFolder != null && inputBaseFolder != null)
             {
-                string? animDirectory = Path.GetDirectoryName(animationPath);
-                if (animDirectory != null)
+     string? animDirectory = Path.GetDirectoryName(animationPath);
+     if (animDirectory != null)
                 {
-                    string relativePath = Path.GetRelativePath(inputBaseFolder, animDirectory);
-                    if (relativePath != ".")
-                    {
-                        outputDir = Path.Combine(outputDir, relativePath);
-                    }
-                }
-            }
-            
-            // Create output directory if it doesn't exist
-            if (!Directory.Exists(outputDir))
-            {
-                Directory.CreateDirectory(outputDir);
-            }
+        string relativePath = Path.GetRelativePath(inputBaseFolder, animDirectory);
+     if (relativePath != ".")
+           {
+      outputDir = Path.Combine(outputFolder, relativePath);
+      }
+    }
+     }
+     
+     // Create output directory if it doesn't exist
+         if (!Directory.Exists(outputDir))
+{
+           Directory.CreateDirectory(outputDir);
+        }
 
-            string fileExtension = exportFormat == ExportFormat.GLTF ? ".gltf" : ".dae";
+       string fileExtension = exportFormat == ExportFormat.GLTF ? ".gltf" : ".dae";
             string outputPath = Path.Combine(outputDir, $"{fileName}{fileExtension}");
 
             IOManager.ExportScene(scene, outputPath, new ExportSettings
             {
-                ExportAnimations = true,
-                FrameRate = 30.0f,
-                BlenderMode = true
-            });
+ExportAnimations = true,
+        FrameRate = 30.0f,
+ BlenderMode = true
+          });
 
             Console.WriteLine($"  Exported: {outputPath}");
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"  Error processing {animationPath}: {ex.Message}");
+    catch (Exception ex)
+      {
+  Console.WriteLine($"  Error processing {animationPath}: {ex.Message}");
         }
     }
 
